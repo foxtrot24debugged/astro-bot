@@ -12,13 +12,13 @@ This investigation sheet helps you gather key technical information from the thr
 
 | Criteria | Details |
 |---------|---------|
-| API Base URL | `_______________________________` |
-| Authentication Method | `_______________________________` |
-| Endpoint to list rooms | `_______________________________` |
-| Endpoint to get messages | `_______________________________` |
-| Endpoint to send message | `_______________________________` |
-| Required headers | `_______________________________` |
-| Sample full GET or POST request | `_______________________________` |
+| API Base URL | `https://webexapis.com/v1` |
+| Authentication Method | `Authorization: Bearer <TOKEN>` |
+| Endpoint to list rooms | `https://webexapis.com/v1/rooms` |
+| Endpoint to get messages | `https://webexapis.com/v1/messages` |
+| Endpoint to send message | `https://webexapis.com/v1/messages` |
+| Required headers | `Authorization: Bearer <TOKEN>`, `Content-Type: application/json` |
+| Sample full GET or POST request | `POST https://webexapis.com/v1/messages` <br> Header: `Authorization: Bearer YOUR_TOKEN` <br> Body: `{"roomId": "ROOM_ID", "text": "Hello Space Bot"}` |
 
 ---
 
@@ -26,10 +26,18 @@ This investigation sheet helps you gather key technical information from the thr
 
 | Criteria | Details |
 |---------|---------|
-| API Base URL | `_______________________________` |
-| Endpoint for current ISS location | `_______________________________` |
+| API Base URL | `http://api.open-notify.org` |
+| Endpoint for current ISS location | `http://api.open-notify.org/iss-now.json` |
 | Sample response format (example JSON) |  
-```
+```json
+{
+  "message": "success",
+  "timestamp": 1713200000,
+  "iss_position": {
+    "latitude": "-24.1234",
+    "longitude": "135.5678"
+  }
+}
 
 ```
 |
@@ -41,14 +49,22 @@ This investigation sheet helps you gather key technical information from the thr
 | Criteria | Details |
 |---------|---------|
 | Provider used (Choose one) | **LocationIQ / Mapbox/ OpenWeatherMap other -provide detail** |
-| API Base URL | `_______________________________` |
-| Endpoint for geocoding | `_______________________________` |
-| Endpoint for reverse geocoding | `_______________________________` |
-| Authentication method | `_______________________________` |
-| Required query parameters | `_______________________________` |
-| Sample request with latitude/longitude | `_______________________________` |
+| API Base URL | `http://api.openweathermap.org/geo/1.0` |
+| Endpoint for geocoding | `http://api.openweathermap.org/geo/1.0/direct` |
+| Endpoint for reverse geocoding | `http://api.openweathermap.org/geo/1.0/reverse` |
+| Authentication method | `API Key (appid query parameter)` |
+| Required query parameters | `lat, lon, limit, appid` |
+| Sample request with latitude/longitude | `http://api.openweathermap.org/geo/1.0/reverse?lat=51.5074&lon=-0.1278&limit=1&appid=YOUR_API_KEY` |
 | Sample JSON response (formatted example) |  
-```
+```[
+  {
+    "name": "London",
+    "lat": 51.5074,
+    "lon": -0.1278,
+    "country": "GB",
+    "state": "England"
+  }
+]
 
 ```
 |
@@ -61,12 +77,18 @@ This investigation sheet helps you gather key technical information from the thr
 | Criteria | Details |
 |---------|---------|
 | API Provider (Choose one) | **OpenWeather, OpenWeatherMap (or other – provide details)** |
-| API Base URL | `_______________________________` |
-| Endpoint for current weather | `_______________________________` |
-| Authentication method | `_______________________________` |
-| Required query parameters | `_______________________________` |
+| API Base URL | `https://api.openweathermap.org/data/2.5` |
+| Endpoint for current weather | `https://api.openweathermap.org/data/2.5/weather` |
+| Authentication method | `API Key (appid query parameter)` |
+| Required query parameters | `lat, lon, units=metric, appid` |
 | Sample JSON response (formatted example) |  
-```
+```{
+  "weather": [{"main": "Clear", "description": "clear sky"}],
+  "main": {"temp": 15.5, "humidity": 68},
+  "wind": {"speed": 3.6},
+  "name": "London",
+  "sys": {"country": "GB"}
+}
 
 ```
 |
@@ -77,13 +99,16 @@ This investigation sheet helps you gather key technical information from the thr
 
 | Criteria | Details |
 |---------|---------|
-| Library used | `_______________________________` |
-| Function used to convert epoch | `_______________________________` |
+| Library used | `datetime / time` |
+| Function used to convert epoch | `datetime.fromtimestamp() or time.strftime()` |
 | Sample code to convert timestamp |  
-```  
+```import datetime
+epoch_time = 1713200000
+human_time = datetime.datetime.fromtimestamp(epoch_time).strftime('%Y-%m-%d %H:%M:%S UTC')
+print(human_time)
 ```
 |
-| Output (human-readable time) | `_______________________________` |
+| Output (human-readable time) | `2024-04-15 17:20:00 UTC` |
 
 ---
 
