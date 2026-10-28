@@ -1,0 +1,15 @@
+# Python temporary cache files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+env/
+
+# Environment and sensitive keys
+.env
+*.pem
+
+# IDE & Editor settings
+.vscode/
+.idea/
