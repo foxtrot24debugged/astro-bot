@@ -1,298 +1,216 @@
-# AstroBot - Web Technology Assignment 1
-# Complete modular implementation
-
 import requests
 import json
 import time
 from datetime import datetime
 
-# =========================
-# CONFIGURATION FUNCTIONS
-# =========================
-def get_webex_token():
-    choice = input("Use hard-coded Webex token? (y/n): ").lower()
-    if choice == "n":
-        token = input("Enter your Webex Access Token: ").strip()
-        return f"Bearer {token}"
-    else:
-        # Fallback placeholder token for testing
-        return "Bearer YOUR_WEBEX_TOKEN"
+def prompt_for_webex_token():
+    use_preset = input("Use default Webex token? (y/n): ").strip().lower()
+    if use_preset == 'n':
+        custom_token = input("Input your Webex token: ").strip()
+        return f"Bearer {custom_token}"
+    return "Bearer YOUR_WEBEX_TOKEN"
 
-def get_api_key(prompt, hardcoded_key):
-    choice = input(f"Use hard-coded {prompt}? (y/n): ").lower()
-    if choice == "n":
-        return input(f"Enter your {prompt}: ").strip()
-    return hardcoded_key
+def prompt_for_key(service_name, default_key):
+    choice = input(f"Use hardcoded {service_name} key? (y/n): ").strip().lower()
+    if choice == 'n':
+        return input(f"Enter {service_name} key: ").strip()
+    return default_key
 
-# =========================
-# WEBEX FUNCTIONS
-# =========================
-def get_rooms(token):
-    url = "https://webexapis.com/v1/rooms"
-    headers = {
-        "Authorization": token,
-        "Content-Type": "application/json"
-    }
-    response = requests.get(url, headers=headers)
-
-    if response.status_code != 200:
-        print("Error fetching rooms:", response.status_code)
+def fetch_webex_rooms(auth_token):
+    endpoint = "https://webexapis.com/v1/rooms"
+    req_headers = {"Authorization": auth_token, "Content-Type": "application/json"}
+    res = requests.get(endpoint, headers=req_headers)
+    
+    if res.status_code != 200:
+        print(f"Failed to retrieve rooms. Status: {res.status_code}")
         return []
+    return res.json().get("items", [])
 
-    return response.json().get("items", [])
+def display_rooms_menu(room_list):
+    print("\n=== Active Webex Rooms ===")
+    for item in room_list:
+        print(f"Name: {item.get('title')} [ID: {item.get('id')}]")
 
-
-def print_rooms(rooms):
-    print("\n--- Available Webex Rooms ---")
-    for room in rooms:
-        print(f"Title: {room.get('title')} | ID: {room.get('id')}")
-
-
-def select_room(rooms):
+def choose_room(room_list):
     while True:
-        name = input("\nEnter the name of the room to monitor: ").strip()
-        for room in rooms:
-            if name.lower() in room.get("title", "").lower():
-                print(f"Selected Room: {room.get('title')}")
-                return room.get("id")
-        print("Room not found. Please try again.")
+        target_name = input("\nType part of the room name to monitor: ").strip().lower()
+        for item in room_list:
+            if target_name in item.get("title", "").lower():
+                print(f"Connected to: {item.get('title')}")
+                return item.get("id")
+        print("No matching room found. Try again.")
 
-
-def get_latest_message(token, room_id):
-    url = "https://webexapis.com/v1/messages"
-    params = {"roomId": room_id, "max": 1}
-    headers = {"Authorization": token}
-
-    response = requests.get(url, headers=headers, params=params)
-
-    if response.status_code != 200:
+def get_latest_msg(auth_token, chat_room_id):
+    endpoint = "https://webexapis.com/v1/messages"
+    req_params = {"roomId": chat_room_id, "max": 1}
+    req_headers = {"Authorization": auth_token}
+    
+    res = requests.get(endpoint, headers=req_headers, params=req_params)
+    if res.status_code != 200:
         return None, None
-
-    data = response.json().get("items", [])
-
-    if not data:
+        
+    items = res.json().get("items", [])
+    if not items:
         return None, None
+        
+    latest_msg = items[0]
+    return latest_msg.get("id"), latest_msg.get("text", "")
 
-    latest = data[0]
-    return latest.get("id"), latest.get("text", "")
+def post_message(auth_token, chat_room_id, text_content):
+    endpoint = "https://webexapis.com/v1/messages"
+    req_headers = {"Authorization": auth_token, "Content-Type": "application/json"}
+    payload = {"roomId": chat_room_id, "text": text_content}
+    requests.post(endpoint, headers=req_headers, data=json.dumps(payload))
 
-
-def send_message(token, room_id, message):
-    url = "https://webexapis.com/v1/messages"
-    headers = {
-        "Authorization": token,
-        "Content-Type": "application/json"
-    }
-    data = {
-        "roomId": room_id,
-        "text": message
-    }
-    requests.post(url, headers=headers, data=json.dumps(data))
-
-# =========================
-# WEATHER FUNCTIONS
-# =========================
-def get_city_coordinates(city, api_key):
-    url = "http://api.openweathermap.org/geo/1.0/direct"
-    params = {"q": city, "limit": 1, "appid": api_key}
-    response = requests.get(url, params=params)
-
-    if response.status_code != 200:
+def lookup_city_coords(city_name, api_key):
+    endpoint = "http://api.openweathermap.org/geo/1.0/direct"
+    params = {"q": city_name, "limit": 1, "appid": api_key}
+    res = requests.get(endpoint, params=params)
+    
+    if res.status_code != 200:
         return None
-
-    data = response.json()
+    data = res.json()
     return data[0] if data else None
 
-
-def get_weather(city, api_key):
-    location = get_city_coordinates(city, api_key)
-
-    if not location:
-        return f"Error: City '{city}' could not be found."
-
-    lat = location["lat"]
-    lon = location["lon"]
-    country = location.get("country", "")
-
-    url = "https://api.openweathermap.org/data/2.5/weather"
-    params = {
-        "lat": lat,
-        "lon": lon,
-        "units": "metric",
-        "appid": api_key
-    }
-
-    response = requests.get(url, params=params)
-
-    if response.status_code != 200:
-        return "Error: Could not retrieve weather data at this time."
-
-    weather = response.json()
-    temp = weather["main"]["temp"]
-    desc = weather["weather"][0]["description"].title()
-    humidity = weather["main"]["humidity"]
-    wind = weather["wind"]["speed"]
-
-    # Simple stargazing evaluation based on sky description
-    stargazing = "Good" if "clear" in desc.lower() else "Poor (Cloudy/Obscured)"
-
+def get_weather_forecast(city_name, api_key):
+    geo_data = lookup_city_coords(city_name, api_key)
+    if not geo_data:
+        return f"Error: Could not locate city '{city_name}'."
+        
+    lat, lon = geo_data["lat"], geo_data["lon"]
+    country_code = geo_data.get("country", "")
+    
+    endpoint = "https://api.openweathermap.org/data/2.5/weather"
+    params = {"lat": lat, "lon": lon, "units": "metric", "appid": api_key}
+    res = requests.get(endpoint, params=params)
+    
+    if res.status_code != 200:
+        return "Error: Weather service unavailable."
+        
+    payload = res.json()
+    temperature = payload["main"]["temp"]
+    condition = payload["weather"][0]["description"].title()
+    hum = payload["main"]["humidity"]
+    wind_spd = payload["wind"]["speed"]
+    
+    stargazing_status = "Good" if "clear" in condition.lower() else "Poor (Cloudy/Obscured)"
+    
     return (
-        f"📍 Weather for {location['name']}, {country}:\n"
-        f"• Condition: {desc}\n"
-        f"• Temperature: {temp}°C\n"
-        f"• Humidity: {humidity}%\n"
-        f"• Wind Speed: {wind} m/s\n"
-        f"🌌 Stargazing Quality: {stargazing}"
+        f"📍 Weather for {geo_data['name']}, {country_code}:\n"
+        f"• Condition: {condition}\n"
+        f"• Temperature: {temperature}°C\n"
+        f"• Humidity: {hum}%\n"
+        f"• Wind Speed: {wind_spd} m/s\n"
+        f"🌌 Stargazing Quality: {stargazing_status}"
     )
 
-# =========================
-# ISS FUNCTIONS
-# =========================
-def reverse_geocode(lat, lon, api_key):
-    url = "http://api.openweathermap.org/geo/1.0/reverse"
+def reverse_lookup_coords(lat, lon, api_key):
+    endpoint = "http://api.openweathermap.org/geo/1.0/reverse"
     params = {"lat": lat, "lon": lon, "limit": 1, "appid": api_key}
-
-    response = requests.get(url, params=params)
-
-    if response.status_code != 200:
+    res = requests.get(endpoint, params=params)
+    if res.status_code != 200:
         return None
-
-    data = response.json()
+    data = res.json()
     return data[0] if data else None
 
-
-def get_iss_location(api_key):
-    url = "http://api.open-notify.org/iss-now.json"
-
-    response = requests.get(url)
-
-    if response.status_code != 200:
-        return "Error: Could not retrieve ISS location from API."
-
-    data = response.json()
-    timestamp = data.get("timestamp")
-    human_time = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S UTC')
-
+def fetch_iss_telemetry(api_key):
+    endpoint = "http://api.open-notify.org/iss-now.json"
+    res = requests.get(endpoint)
+    if res.status_code != 200:
+        return "Error: Unable to fetch ISS telemetry."
+        
+    data = res.json()
+    ts = data.get("timestamp")
+    formatted_time = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S UTC')
+    
     lat = data["iss_position"]["latitude"]
     lon = data["iss_position"]["longitude"]
-
-    location = reverse_geocode(lat, lon, api_key)
-    place = "Over Ocean / No Nearby City"
-
-    if location:
-        place = f"{location.get('name')}, {location.get('country')}"
-
+    
+    place_info = reverse_lookup_coords(lat, lon, api_key)
+    location_desc = "Over Ocean / No Nearby City"
+    if place_info:
+        location_desc = f"{place_info.get('name')}, {place_info.get('country')}"
+        
     return (
         f"🛸 ISS Current Location:\n"
         f"• Latitude: {lat}\n"
         f"• Longitude: {lon}\n"
-        f"• Nearest Location: {place}\n"
-        f"• Time: {human_time}"
+        f"• Nearest Location: {location_desc}\n"
+        f"• Time: {formatted_time}"
     )
 
-# =========================
-# EXTENDED FEATURE (ASTRONOMY SUN/MOON)
-# =========================
-def get_sun_times(city, api_key):
-    location = get_city_coordinates(city, api_key)
-    if not location:
-        return f"Error: City '{city}' not found."
-
-    lat, lon = location["lat"], location["lon"]
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "daily": "sunrise,sunset",
-        "timezone": "auto"
-    }
-    res = requests.get(url, params=params)
+def fetch_sun_schedule(city_name, api_key):
+    geo_data = lookup_city_coords(city_name, api_key)
+    if not geo_data:
+        return f"Error: City '{city_name}' not found."
+        
+    lat, lon = geo_data["lat"], geo_data["lon"]
+    endpoint = "https://api.open-meteo.com/v1/forecast"
+    params = {"latitude": lat, "longitude": lon, "daily": "sunrise,sunset", "timezone": "auto"}
+    res = requests.get(endpoint, params=params)
     if res.status_code != 200:
-        return "Error: Stargazing solar times unavailable."
-
+        return "Error: Solar schedule unavailable."
+        
     data = res.json()
-    sunrise = data["daily"]["sunrise"][0].split("T")[1]
-    sunset = data["daily"]["sunset"][0].split("T")[1]
-
+    sunrise_time = data["daily"]["sunrise"][0].split("T")[1]
+    sunset_time = data["daily"]["sunset"][0].split("T")[1]
+    
     return (
-        f"☀️ Solar Schedule for {location['name']}:\n"
-        f"• Sunrise: {sunrise}\n"
-        f"• Sunset: {sunset}\n"
-        f"🌌 Stargazing begins after sunset!"
+        f"☀️ Solar Schedule for {geo_data['name']}:\n"
+        f"• Sunrise: {sunrise_time}\n"
+        f"• Sunset: {sunset_time}\n"
+        f"• Stargazing begins after sunset!"
     )
 
-# =========================
-# MAIN BOT LOGIC
-# =========================
 def main():
-    token = get_webex_token()
-
-    weather_key = get_api_key(
-        "Weather API key",
-        "YOUR_OPENWEATHER_API_KEY"
-    )
-
-    rooms = get_rooms(token)
-
+    token = prompt_for_webex_token()
+    weather_key = prompt_for_key("Weather API key", "YOUR_OPENWEATHER_API_KEY")
+    
+    rooms = fetch_webex_rooms(token)
     if not rooms:
-        print("No Webex rooms found or invalid token provided.")
+        print("Initialization failed: No rooms available.")
         return
-
-    print_rooms(rooms)
-    room_id = select_room(rooms)
-
-    last_message_id, _ = get_latest_message(token, room_id)
-    print("\n[AstroBot Active] Polling for Webex messages...")
-
+        
+    display_rooms_menu(rooms)
+    room_id = choose_room(rooms)
+    
+    last_msg_id, _ = get_latest_msg(token, room_id)
+    print("\n--- Bot Running & Polling ---")
+    
     while True:
-        message_id, message_text = get_latest_message(token, room_id)
-
-        if message_id and message_id != last_message_id:
-            last_message_id = message_id
-
-            print(f"Received message: '{message_text}'")
-
-            if not message_text.startswith("/"):
-                continue
-
-            cmd_lower = message_text.lower().strip()
-
-            if cmd_lower == "/help":
-                send_message(
-                    token,
-                    room_id,
-                    "AstroBot Commands:\n/weather <city>\n/iss\n/sun <city>\n/help\n/quit"
-                )
-
-            elif cmd_lower.startswith("/weather"):
-                parts = message_text.split(maxsplit=1)
-                if len(parts) < 2:
-                    send_message(token, room_id, "Usage: /weather <city>")
+        msg_id, msg_text = get_latest_msg(token, room_id)
+        
+        if msg_id and msg_id != last_msg_id:
+            last_msg_id = msg_id
+            print(f"New message caught: '{msg_text}'")
+            
+            if msg_text.startswith("/"):
+                command_lower = msg_text.lower().strip()
+                
+                if command_lower == "/help":
+                    post_message(token, room_id, "AstroBot Commands:\n/weather <city>\n/iss\n/sun <city>\n/help\n/quit")
+                elif command_lower.startswith("/weather"):
+                    chunks = msg_text.split(maxsplit=1)
+                    if len(chunks) < 2:
+                        post_message(token, room_id, "Usage: /weather <city>")
+                    else:
+                        post_message(token, room_id, get_weather_forecast(chunks[1], weather_key))
+                elif command_lower.startswith("/sun"):
+                    chunks = msg_text.split(maxsplit=1)
+                    if len(chunks) < 2:
+                        post_message(token, room_id, "Usage: /sun <city>")
+                    else:
+                        post_message(token, room_id, fetch_sun_schedule(chunks[1], weather_key))
+                elif command_lower == "/iss":
+                    post_message(token, room_id, fetch_iss_telemetry(weather_key))
+                elif command_lower == "/quit":
+                    post_message(token, room_id, "AstroBot shutting down.")
+                    print("Shutdown command received.")
+                    break
                 else:
-                    city = parts[1]
-                    send_message(token, room_id, get_weather(city, weather_key))
-
-            elif cmd_lower.startswith("/sun"):
-                parts = message_text.split(maxsplit=1)
-                if len(parts) < 2:
-                    send_message(token, room_id, "Usage: /sun <city>")
-                else:
-                    city = parts[1]
-                    send_message(token, room_id, get_sun_times(city, weather_key))
-
-            elif cmd_lower == "/iss":
-                send_message(token, room_id, get_iss_location(weather_key))
-
-            elif cmd_lower == "/quit":
-                send_message(token, room_id, "AstroBot shutting down.")
-                print("Bot shut down requested via command.")
-                break
-
-            else:
-                send_message(token, room_id, "Unknown command. Use /help for a list of available commands.")
-
+                    post_message(token, room_id, "Unknown command. Type /help for assistance.")
+                    
         time.sleep(5)
-
 
 if __name__ == '__main__':
     main()
